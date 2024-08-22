@@ -4,6 +4,7 @@ from utils import get_openai_response, speech_to_text, text_to_speech, autoplay_
 from audio_recorder_streamlit import audio_recorder
 from streamlit_float import *
 
+# Set up the page
 st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
 
 float_init()
@@ -18,29 +19,34 @@ initialize_session_state()
 
 st.title("Your Personal Voice Assistant 🤖")
 
+# Voice selection and audio input
 voice_col1, voice_col2 = st.columns([1, 2])
 with voice_col1:
     voice = st.selectbox(
         "Choose your preferred voice",
         ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
         placeholder="Select a voice"
-    ).lower()
+        ).lower()
 
 footer = st.container()
 
+# Text input
 prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
 with footer:
     audio = audio_recorder()
 
+# Display previous messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
 
+# If there's a text input
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
+# If there's audio input
 if audio:
     with st.spinner("Transcribing audio..."):
         audio_file = 'temp_audio.mp3'
@@ -54,6 +60,7 @@ if audio:
                 st.write(transcript)
             os.remove(audio_file)
 
+# Generate a response if the last message is from the user
 if st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -66,5 +73,6 @@ if st.session_state.messages[-1]["role"] == "user":
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
         os.remove(response_audio)
-    
+
+# Footer floating effect
 footer.float("bottom: -0.25rem;")
