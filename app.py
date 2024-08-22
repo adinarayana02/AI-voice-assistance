@@ -24,11 +24,10 @@ with voice_col1:
         "Choose your preferred voice",
         ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
         placeholder="Select a voice"
-        ).lower()
+    ).lower()
 
 footer = st.container()
 
-prompt = None
 prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
 with footer:
     audio = audio_recorder()
@@ -45,27 +44,41 @@ if prompt:
 if audio:
     with st.spinner("Transcribing audio..."):
         audio_file = 'temp_audio.mp3'
-        with open(audio_file, 'wb') as f:
-            f.write(audio)
+        try:
+            with open(audio_file, 'wb') as f:
+                f.write(audio)
 
-        transcript = speech_to_text(audio_file)
-        if transcript:
-            st.session_state.messages.append({"role": "user", "content": transcript})
-            with st.chat_message("user"):
-                st.write(transcript)
-            os.remove(audio_file)
+            transcript = speech_to_text(audio_file)
+            if transcript:
+                st.session_state.messages.append({"role": "user", "content": transcript})
+                with st.chat_message("user"):
+                    st.write(transcript)
+        except Exception as e:
+            st.error(f"Error transcribing audio: {e}")
+        finally:
+            if os.path.exists(audio_file):
+                os.remove(audio_file)
 
 if st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = get_openai_response(st.session_state.messages)
+            try:
+                response = get_openai_response(st.session_state.messages)
+            except Exception as e:
+                st.error(f"Error getting response from OpenAI: {e}")
+                response = "Sorry, I encountered an error while processing your request."
 
         with st.spinner("Generating response..."):
-            response_audio = text_to_speech(response, voice)
-            autoplay_audio(response_audio)
+            try:
+                response_audio = text_to_speech(response, voice)
+                autoplay_audio(response_audio)
+            except Exception as e:
+                st.error(f"Error generating text-to-speech audio: {e}")
+                response_audio = None
 
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
-        os.remove(response_audio)
+        if response_audio and os.path.exists(response_audio):
+            os.remove(response_audio)
     
 footer.float("bottom: -0.25rem;")
