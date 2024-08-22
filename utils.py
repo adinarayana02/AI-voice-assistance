@@ -10,9 +10,9 @@ def get_openai_response(messages):
     try:
         # Prepare the request for OpenAI's GPT model
         response = openai.ChatCompletion.create(
-            model="gpt-4",
+            model="gpt-4",  # Ensure this is a model you have access to
             messages=messages
-        )               
+        )
         return response.choices[0].message['content']
     except Exception as e:
         st.error(f"Error generating response: {e}")
@@ -21,7 +21,7 @@ def get_openai_response(messages):
 def speech_to_text(audio_binary):
     try:
         with open(audio_binary, 'rb') as audio_file:
-            response = openai.Audio.create(
+            response = openai.Audio.transcribe(
                 model="whisper-1",
                 file=audio_file,
                 response_format='text'
@@ -33,6 +33,7 @@ def speech_to_text(audio_binary):
 
 def text_to_speech(text, voice='nova'):
     try:
+        # Note: Replace this with the actual API for text-to-speech
         response = openai.Audio.create(
             model="text-to-speech",
             input=text,
@@ -41,7 +42,6 @@ def text_to_speech(text, voice='nova'):
         response_audio = '_output_audio.mp3'
         with open(response_audio, 'wb') as f:
             f.write(response['data'])
-        
         return response_audio
     except Exception as e:
         st.error(f"Error generating speech: {e}")
