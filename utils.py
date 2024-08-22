@@ -65,3 +65,4 @@ def autoplay_audio(audio_file):
         st.markdown(md, unsafe_allow_html=True)
     except Exception as e:
         st.error(f"Error playing audio: {e}")
+
