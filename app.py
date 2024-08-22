@@ -1,68 +1,84 @@
-import openai
-from dotenv import load_dotenv
-import os
-import base64
 import streamlit as st
+import os
+from utils import get_openai_response, speech_to_text, text_to_speech, autoplay_audio
+from audio_recorder_streamlit import audio_recorder
+from streamlit_float import *
 
-# Load environment variables
-load_dotenv()
+st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
 
-# Set API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+float_init()
 
-def get_openai_response(messages):
-    system_message = [{ "role": "system", "content": "You are a helpful AI chatbot that answers questions asked by the user." }]
-    prompt_message = system_message + messages
+def initialize_session_state():
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hi! How may I assist you today?"}
+        ]
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=prompt_message
-        )
-        return response.choices[0].message['content']
-    except openai.OpenAIError as e:
-        st.error(f"Error getting response from OpenAI: {e}")
-        return "Sorry, I couldn't generate a response."
+initialize_session_state()
 
-def speech_to_text(audio_binary):
-    try:
-        with open(audio_binary, 'rb') as audio_file:
-            transcript = openai.Audio.transcriptions.create(
-                model='whisper-1',
-                file=audio_file,
-                response_format='text'
-            )
-        return transcript['text']
-    except openai.OpenAIError as e:
-        st.error(f"Error transcribing audio: {e}")
-        return None
+st.title("Your Personal Voice Assistant 🤖")
 
-def text_to_speech(text, voice='nova'):
-    try:
-        response = openai.Audio.speech.create(
-            model='tts-1',
-            input=text,
-            voice=voice
-        )   
-        response_audio = '_output_audio.mp3'
-        with open(response_audio, 'wb') as f:
-            f.write(response['audio'])
-        return response_audio
-    except openai.OpenAIError as e:
-        st.error(f"Error generating text-to-speech audio: {e}")
-        return None
+voice_col1, voice_col2 = st.columns([1, 2])
+with voice_col1:
+    voice = st.selectbox(
+        "Choose your preferred voice",
+        ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
+        placeholder="Select a voice"
+    ).lower()
 
-def autoplay_audio(audio_file):
-    try:
-        with open(audio_file, 'rb') as audio_file_:
-            audio_bytes = audio_file_.read()
+footer = st.container()
 
-        b64 = base64.b64encode(audio_bytes).decode("utf-8")    
-        md = f"""
-        <audio autoplay>
-            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
-        """
-        st.markdown(md, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Error playing audio: {e}")
+prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
+with footer:
+    audio = audio_recorder()
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.write(prompt)
+
+if audio:
+    with st.spinner("Transcribing audio..."):
+        audio_file = 'temp_audio.mp3'
+        try:
+            with open(audio_file, 'wb') as f:
+                f.write(audio)
+
+            transcript = speech_to_text(audio_file)
+            if transcript:
+                st.session_state.messages.append({"role": "user", "content": transcript})
+                with st.chat_message("user"):
+                    st.write(transcript)
+        except Exception as e:
+            st.error(f"Error transcribing audio: {e}")
+        finally:
+            if os.path.exists(audio_file):
+                os.remove(audio_file)
+
+if st.session_state.messages[-1]["role"] == "user":
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            try:
+                response = get_openai_response(st.session_state.messages)
+            except Exception as e:
+                st.error(f"Error getting response from OpenAI: {e}")
+                response = "Sorry, I encountered an error while processing your request."
+
+        with st.spinner("Generating response..."):
+            try:
+                response_audio = text_to_speech(response, voice)
+                autoplay_audio(response_audio)
+            except Exception as e:
+                st.error(f"Error generating text-to-speech audio: {e}")
+                response_audio = None
+
+        st.write(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        if response_audio and os.path.exists(response_audio):
+            os.remove(response_audio)
+    
+footer.float("bottom: -0.25rem;")
