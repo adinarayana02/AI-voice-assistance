@@ -44,41 +44,27 @@ if prompt:
 if audio:
     with st.spinner("Transcribing audio..."):
         audio_file = 'temp_audio.mp3'
-        try:
-            with open(audio_file, 'wb') as f:
-                f.write(audio)
+        with open(audio_file, 'wb') as f:
+            f.write(audio)
 
-            transcript = speech_to_text(audio_file)
-            if transcript:
-                st.session_state.messages.append({"role": "user", "content": transcript})
-                with st.chat_message("user"):
-                    st.write(transcript)
-        except Exception as e:
-            st.error(f"Error transcribing audio: {e}")
-        finally:
-            if os.path.exists(audio_file):
-                os.remove(audio_file)
+        transcript = speech_to_text(audio_file)
+        if transcript:
+            st.session_state.messages.append({"role": "user", "content": transcript})
+            with st.chat_message("user"):
+                st.write(transcript)
+            os.remove(audio_file)
 
 if st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            try:
-                response = get_openai_response(st.session_state.messages)
-            except Exception as e:
-                st.error(f"Error getting response from OpenAI: {e}")
-                response = "Sorry, I encountered an error while processing your request."
+            response = get_openai_response(st.session_state.messages)
 
         with st.spinner("Generating response..."):
-            try:
-                response_audio = text_to_speech(response, voice)
-                autoplay_audio(response_audio)
-            except Exception as e:
-                st.error(f"Error generating text-to-speech audio: {e}")
-                response_audio = None
+            response_audio = text_to_speech(response, voice)
+            autoplay_audio(response_audio)
 
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
-        if response_audio and os.path.exists(response_audio):
-            os.remove(response_audio)
+        os.remove(response_audio)
     
 footer.float("bottom: -0.25rem;")
