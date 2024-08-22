@@ -1,5 +1,5 @@
-streamlit
-openai
-audio_recorder_streamlit
-streamlit-float
-python-dotenv
+streamlit==1.16.0
+openai==1.0.0
+python-dotenv==1.0.0
+streamlit-float==0.1.0
+audio-recorder-streamlit==0.1.0
