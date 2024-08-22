@@ -1,53 +1,54 @@
-from openai import OpenAI
+import openai
 from dotenv import load_dotenv
 import os
 import base64
 import streamlit as st
 
+# Load environment variables
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
+# Set API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_openai_response(messages):
     system_message = [{ "role": "system", "content": "You are a helpful AI chatbot that answers questions asked by the user." }]
     prompt_message = system_message + messages
 
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
             messages=prompt_message
         )
-        return response.choices[0].message.content
-    except Exception as e:
+        return response.choices[0].message['content']
+    except openai.OpenAIError as e:
         st.error(f"Error getting response from OpenAI: {e}")
         return "Sorry, I couldn't generate a response."
 
 def speech_to_text(audio_binary):
     try:
         with open(audio_binary, 'rb') as audio_file:
-            transcript = client.audio.transcriptions.create(
+            transcript = openai.Audio.transcriptions.create(
                 model='whisper-1',
                 file=audio_file,
                 response_format='text'
             )
-        return transcript
-    except Exception as e:
+        return transcript['text']
+    except openai.OpenAIError as e:
         st.error(f"Error transcribing audio: {e}")
         return None
 
 def text_to_speech(text, voice='nova'):
     try:
-        response = client.audio.speech.create(
+        response = openai.Audio.speech.create(
             model='tts-1',
             input=text,
             voice=voice
         )   
         response_audio = '_output_audio.mp3'
         with open(response_audio, 'wb') as f:
-            response.stream_to_file(response_audio)
+            f.write(response['audio'])
         return response_audio
-    except Exception as e:
+    except openai.OpenAIError as e:
         st.error(f"Error generating text-to-speech audio: {e}")
         return None
 
