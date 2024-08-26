@@ -1,16 +1,12 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
-from utils import get_openai_response, speech_to_text_with_vad, text_to_speech, autoplay_audio
+from utils import get_llm_response, speech_to_text_with_vad, text_to_speech, autoplay_audio
 from audio_recorder_streamlit import audio_recorder
-from streamlit_float import float_init
+from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
 st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
-
-float_init()
 
 def initialize_session_state():
     if "messages" not in st.session_state:
@@ -26,9 +22,13 @@ voice_col1, voice_col2 = st.columns([1, 2])
 with voice_col1:
     voice = st.selectbox(
         "Choose your preferred voice",
-        ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
+        ['Male', 'Female'],
         placeholder="Select a voice"
         ).lower()
+
+with voice_col2:
+    pitch = st.slider("Pitch", min_value=-10, max_value=10, value=0)
+    speed = st.slider("Speed", min_value=0.5, max_value=2.0, value=1.0)
 
 footer = st.container()
 
@@ -62,10 +62,10 @@ if audio:
 if st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            response = get_openai_response(st.session_state.messages)
+            response = get_llm_response(st.session_state.messages)
 
         with st.spinner("Generating response..."):
-            response_audio = text_to_speech(response, voice)
+            response_audio = text_to_speech(response, voice, pitch, speed)
             autoplay_audio(response_audio)
 
         st.write(response)
