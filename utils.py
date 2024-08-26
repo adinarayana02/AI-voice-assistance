@@ -1,11 +1,10 @@
+import openai
 import whisper
 import numpy as np
 import wave
 import webrtcvad
-import openai
-import io
-from pydub import AudioSegment
 import edge_tts
+import io
 import os
 
 # Set up OpenAI API key
@@ -59,9 +58,9 @@ def get_llm_response(text):
 
 # Convert text to speech using Edge TTS
 async def text_to_speech(text, voice='en-US-JennyNeural', pitch='0%', speed='1.0'):
-    communicator = edge_tts.Communicate()
+    communicate = edge_tts.Communicate()
     output_file = "output.mp3"
-    await communicator.synthesize(text, voice, pitch, speed, output_file)
+    await communicate.synthesize(text, voice, pitch, speed, output_file)
     return output_file
 
 # Restrict the output to 2 sentences
