@@ -44,7 +44,7 @@ if prompt:
 
 if audio:
     with st.spinner("Transcribing audio..."):
-        audio_file = 'temp_audio.wav'
+        audio_file = 'temp_audio.mp3'
         with open(audio_file, 'wb') as f:
             f.write(audio)
 
@@ -67,5 +67,5 @@ if st.session_state.messages[-1]["role"] == "user":
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
         os.remove(response_audio)
-
+    
 footer.float("bottom: -0.25rem;")
