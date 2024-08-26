@@ -1,8 +1,7 @@
-streamlit
-openai==0.27.8
-python-dotenv
-pydub
-audio-recorder-streamlit
-streamlit-float
-whisper
-gtts
+streamlit==1.18.1
+openai==0.27.5
+gtts==2.3.0
+pydub==0.25.1
+python-dotenv==1.0.0
+audio_recorder_streamlit==0.1.1
+streamlit-float==0.1.0
