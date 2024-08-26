@@ -1,9 +1,10 @@
 import streamlit as st
+import os
 import tempfile
 from utils import get_gpt4omini_response, speech_to_text_with_vad, text_to_speech, autoplay_audio, vad
 
 def main():
-    st.title("AI Voice Assistance with GPT-4-OMini")
+    st.title("AI Voice Assistance with GPT-4o Mini")
 
     # Upload audio file section
     st.header("Upload Audio")
@@ -23,7 +24,7 @@ def main():
                 transcript = speech_to_text_with_vad(vad_file)
                 st.write(transcript)
 
-                st.write("Chat with GPT-4-OMini:")
+                st.write("Chat with GPT-4o Mini:")
                 user_query = st.text_input("Your query:", "")
                 if user_query:
                     response = get_gpt4omini_response(user_query)
@@ -58,7 +59,7 @@ def main():
                 transcript = speech_to_text_with_vad(vad_file)
                 st.write(transcript)
 
-                st.write("Chat with GPT-4-OMini:")
+                st.write("Chat with GPT-4o Mini:")
                 user_query = st.text_input("Your query:", "")
                 if user_query:
                     response = get_gpt4omini_response(user_query)
