@@ -2,6 +2,7 @@ import openai
 import webrtcvad
 import numpy as np
 import wave
+import whisper
 import tempfile
 from gtts import gTTS
 from io import BytesIO
@@ -19,7 +20,7 @@ def get_openai_response(messages):
     Get response from GPT-4 using OpenAI API.
     """
     response = openai.ChatCompletion.create(
-        model="gpt-4-omni",  # Ensure this is the correct model name for GPT-4-OMini
+        model="gpt-4o-mini",  # Ensure this is the correct model name for GPT-4-OMini
         messages=messages
     )
     return response['choices'][0]['message']['content']
@@ -30,7 +31,7 @@ def speech_to_text_with_vad(audio_file):
     """
     vad_file = vad(audio_file)
     # Assume VAD processing returns a valid WAV file path
-    import whisper
+    
     model = whisper.load_model("base")
     result = model.transcribe(vad_file)
     return result['text']
@@ -89,7 +90,7 @@ def vad(audio_file):
     # Save filtered audio
     vad_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
     with wave.open(vad_file.name, 'wb') as wf:
-        wf.setnchannels(1)  # Assuming mono audio
+        wf.setnchannels(num_channels)
         wf.setsampwidth(sampwidth)
         wf.setframerate(sample_rate)
         wf.writeframes(filtered_audio)
