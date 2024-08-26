@@ -1,69 +1,56 @@
-import openai
-import whisper
-import numpy as np
-import wave
-import webrtcvad
-import edge_tts
-import io
+from openai import OpenAI
+from dotenv import load_dotenv
 import os
+import base64
+import streamlit as st
 
-# Set up OpenAI API key
-openai.api_key = os.getenv('OPENAI_API_KEY')
+load_dotenv()
 
-# Function to read WAV file
-def read_wav(file_path):
-    with wave.open(file_path, 'rb') as wf:
-        sample_rate = wf.getframerate()
-        n_channels = wf.getnchannels()
-        samp_width = wf.getsampwidth()
-        n_frames = wf.getnframes()
-        audio = wf.readframes(n_frames)
-        return np.frombuffer(audio, dtype=np.int16), sample_rate
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
-# Function to perform VAD
-def vad(audio, sample_rate, vad_mode=1):
-    vad = webrtcvad.Vad(vad_mode)
-    frame_duration = 30  # ms
-    frame_size = int(sample_rate * frame_duration / 1000)
-    frames = [audio[i:i + frame_size] for i in range(0, len(audio), frame_size)]
-    return [frame for frame in frames if vad.is_speech(frame, sample_rate)]
+def get_openai_response(messages):
+    system_message = [{ "role": "system", "content": "You are an helpful AI chatbot, that answers questions asked by User." }]
+    prompt_message = system_message + messages
 
-# Convert audio to text using Whisper
-def audio_to_text(audio_path):
-    model = whisper.load_model("base")  # Load Whisper model
-    audio, sample_rate = read_wav(audio_path)
-    audio = np.array(vad(audio, sample_rate))
-    audio_wav = io.BytesIO()
-    audio_segment = AudioSegment(
-        audio.tobytes(), 
-        frame_rate=sample_rate, 
-        sample_width=2, 
-        channels=1
-    )
-    audio_segment.export(audio_wav, format="wav")
-    audio_wav.seek(0)
-    result = model.transcribe(audio_wav, fp16=False)
-    return result['text']
-
-# Get response from OpenAI's GPT-4o-mini model
-def get_llm_response(text):
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": text}
-        ]
-    )
-    return response.choices[0].message['content']
+        messages=prompt_message
+        )               
+    return response.choices[0].message.content
 
-# Convert text to speech using Edge TTS
-async def text_to_speech(text, voice='en-US-JennyNeural', pitch='0%', speed='1.0'):
-    communicate = edge_tts.Communicate()
-    output_file = "output.mp3"
-    await communicate.synthesize(text, voice, pitch, speed, output_file)
-    return output_file
 
-# Restrict the output to 2 sentences
-def restrict_output(response_text):
-    sentences = response_text.split('. ')
-    return '. '.join(sentences[:2]) + ('.' if sentences else '')
+def speech_to_text(audio_binary):
+    with open(audio_binary, 'rb') as audio_file:
+        transcript = client.audio.transcriptions.create(
+            model='whisper-1',
+            file=audio_file,
+            response_format='text'
+        )
+
+    return transcript
+
+def text_to_speech(text, voice='nova'):
+    response = client.audio.speech.create(
+        model='tts-1',
+        input=text,
+        voice=voice
+    )   
+
+    response_audio = '_output_audio.mp3'
+    with open(response_audio, 'wb') as f:
+        response.stream_to_file(response_audio)
+
+    return response_audio
+
+def autoplay_audio(audio_file):
+    with open(audio_file, 'rb') as audio_file_:
+        audio_bytes = audio_file_.read()
+
+    b64 = base64.b64encode(audio_bytes).decode("utf-8")    
+    md = f"""
+    <audio autoplay>
+        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+    </audio>
+    """
+    st.markdown(md, unsafe_allow_html=True)
