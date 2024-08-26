@@ -6,8 +6,13 @@ import tempfile
 from gtts import gTTS
 from io import BytesIO
 import whisper
+from dotenv import load_dotenv
+import os
 
-# Initialize OpenAI API (replace with your own API key)
+# Load environment variables
+load_dotenv()
+
+# Initialize OpenAI API
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def get_gpt4omini_response(prompt):
@@ -64,6 +69,7 @@ def save_wave(path, audio, sample_rate):
         wf.writeframes(audio)
 
 def vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, audio):
+    from collections import deque
     num_padding_frames = padding_duration_ms // frame_duration_ms
     ring_buffer = deque(maxlen=num_padding_frames)
     triggered = False
