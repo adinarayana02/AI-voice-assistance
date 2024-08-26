@@ -1,53 +1,71 @@
 import streamlit as st
-import io
-from utils import get_llm_response, audio_to_text, text_to_speech, restrict_output
-import asyncio
+import os
+from utils import get_openai_response, speech_to_text, text_to_speech, autoplay_audio
+from audio_recorder_streamlit import audio_recorder
+from streamlit_float import *
 
-# Streamlit app
-st.title("Voice and Text AI Assistant")
+st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
 
-# Audio input section
-st.header("Voice Input")
-audio_file = st.file_uploader("Upload an audio file", type=["wav", "mp3"])
+float_init()
 
-if st.button("Record Audio"):
-    st.write("Please record your audio below.")
-    # Use `st.audio` to capture audio input from microphone if available
+def initialize_session_state():
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {"role": "assistant", "content": "Hi! How may I assist you today?"}
+        ]
 
-# Text input section
-st.header("Text Input")
-user_input = st.text_area("Enter your query here")
+initialize_session_state()
 
-if st.button("Submit"):
-    # Handle audio file input
-    if audio_file is not None:
-        with open("temp_audio.wav", "wb") as f:
-            f.write(audio_file.read())
-        # Convert audio to text
-        query_text = audio_to_text("temp_audio.wav")
-    else:
-        query_text = user_input
+st.title("Your Personal Voice Assistant 🤖")
+
+voice_col1, voice_col2 = st.columns([1, 2])
+with voice_col1:
+    voice = st.selectbox(
+        "Choose your preferred voice",
+        ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
+        placeholder="Select a voice"
+        ).lower()
+
+footer = st.container()
+
+prompt = None
+prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
+with footer:
+    audio = audio_recorder()
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.write(prompt)
+
+if audio:
+    with st.spinner("Transcribing audio..."):
+        audio_file = 'temp_audio.mp3'
+        with open(audio_file, 'wb') as f:
+            f.write(audio)
+
+        transcript = speech_to_text(audio_file)
+        if transcript:
+            st.session_state.messages.append({"role": "user", "content": transcript})
+            with st.chat_message("user"):
+                st.write(transcript)
+            os.remove(audio_file)
+
+if st.session_state.messages[-1]["role"] == "user":
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = get_openai_response(st.session_state.messages)
+
+        with st.spinner("Generating response..."):
+            response_audio = text_to_speech(response, voice)
+            autoplay_audio(response_audio)
+
+        st.write(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        os.remove(response_audio)
     
-    # Restrict the response to 2 sentences
-    query_text = restrict_output(query_text)
-    
-    # Get response from LLM
-    response_text = get_llm_response(query_text)
-    
-    # Restrict response text to 2 sentences
-    response_text = restrict_output(response_text)
-    
-    # Convert text to speech
-    async def generate_speech():
-        audio_file = await text_to_speech(response_text)
-        return audio_file
-    
-    audio_file_path = asyncio.run(generate_speech())
-    
-    # Display response
-    st.subheader("AI Response")
-    st.write(response_text)
-    
-    # Play audio response
-    with open(audio_file_path, "rb") as audio_file:
-        st.audio(audio_file.read(), format="audio/mp3")
+footer.float("bottom: -0.25rem;")
