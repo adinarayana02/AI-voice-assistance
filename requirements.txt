@@ -9,3 +9,4 @@ torch
 soundfile
 setuptools
 python-dotenv
+audio_recorder_streamlit
