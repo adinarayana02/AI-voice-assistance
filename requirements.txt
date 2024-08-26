@@ -4,3 +4,5 @@ python-dotenv
 pydub
 audio-recorder-streamlit
 streamlit-float
+whisper
+gtts
