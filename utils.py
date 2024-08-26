@@ -1,4 +1,5 @@
 import openai
+import os
 import webrtcvad
 import numpy as np
 import wave
