@@ -5,6 +5,7 @@ whisper
 gtts
 pydub
 numpy
+audio_recorder_streamlit
 torch
 soundfile
 setuptools
