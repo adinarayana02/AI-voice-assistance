@@ -1,9 +1,10 @@
-streamlit==1.24.0
-openai==0.27.7
-webrtcvad==2.0.10
-whisper==1.1
-gtts==2.2.3
-pydub==0.25.1
-numpy==1.25.0
-torch==2.0.1  # Required for Whisper
-soundfile==0.11.0  # Whisper dependency for audio processing
+streamlit
+openai
+webrtcvad
+whisper
+gtts
+pydub
+numpy
+torch
+soundfile
+setuptools
