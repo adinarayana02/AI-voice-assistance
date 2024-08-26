@@ -61,8 +61,9 @@ if st.session_state.messages[-1]["role"] == "user":
             response = get_openai_response(st.session_state.messages)
 
         with st.spinner("Generating response..."):
-            response_audio = text_to_speech(response, voice)
-            autoplay_audio(response_audio)
+            response_audio = text_to_speech(response)
+            if response_audio:
+                autoplay_audio(response_audio)
 
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
