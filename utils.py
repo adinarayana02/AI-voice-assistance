@@ -1,66 +1,56 @@
-import openai
+from openai import OpenAI
+from dotenv import load_dotenv
 import os
-import streamlit as st
 import base64
+import streamlit as st
 
-# Load the OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
 def get_openai_response(messages):
-    try:
-        # Prepare the request for OpenAI's GPT model
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # Ensure this is a model you have access to
-            messages=messages
-        )
-        return response.choices[0].message['content']
-    except Exception as e:
-        st.error(f"Error generating response: {e}")
-        return "Sorry, I couldn't process your request at the moment."
+    system_message = [{ "role": "system", "content": "You are an helpful AI chatbot, that answers questions asked by User." }]
+    prompt_message = system_message + messages
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=prompt_message
+        )               
+    return response.choices[0].message.content
+
 
 def speech_to_text(audio_binary):
-    try:
-        with open(audio_binary, 'rb') as audio_file:
-            response = openai.Audio.transcribe(
-                model="whisper-1",
-                file=audio_file,
-                response_format='text'
-            )
-        return response['text']
-    except Exception as e:
-        st.error(f"Error transcribing audio: {e}")
-        return None
+    with open(audio_binary, 'rb') as audio_file:
+        transcript = client.audio.transcriptions.create(
+            model='whisper-1',
+            file=audio_file,
+            response_format='text'
+        )
+
+    return transcript
 
 def text_to_speech(text, voice='nova'):
-    try:
-        # Note: Replace this with the actual API for text-to-speech
-        response = openai.Audio.create(
-            model="text-to-speech",
-            input=text,
-            voice=voice
-        )
-        response_audio = '_output_audio.mp3'
-        with open(response_audio, 'wb') as f:
-            f.write(response['data'])
-        return response_audio
-    except Exception as e:
-        st.error(f"Error generating speech: {e}")
-        return None
+    response = client.audio.speech.create(
+        model='tts-1',
+        input=text,
+        voice=voice
+    )   
+
+    response_audio = '_output_audio.mp3'
+    with open(response_audio, 'wb') as f:
+        response.stream_to_file(response_audio)
+
+    return response_audio
 
 def autoplay_audio(audio_file):
-    try:
-        if audio_file:
-            with open(audio_file, 'rb') as audio_file_:
-                audio_bytes = audio_file_.read()
-            
-            b64 = base64.b64encode(audio_bytes).decode("utf-8")
-            md = f"""
-            <audio autoplay>
-                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-            </audio>
-            """
-            st.markdown(md, unsafe_allow_html=True)
-        else:
-            st.error("No audio file provided for playback.")
-    except Exception as e:
-        st.error(f"Error playing audio: {e}")
+    with open(audio_file, 'rb') as audio_file_:
+        audio_bytes = audio_file_.read()
+
+    b64 = base64.b64encode(audio_bytes).decode("utf-8")    
+    md = f"""
+    <audio autoplay>
+        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+    </audio>
+    """
+    st.markdown(md, unsafe_allow_html=True)
