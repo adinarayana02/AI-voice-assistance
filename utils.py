@@ -1,68 +1,70 @@
-import os
-import openai
 import whisper
+import numpy as np
+import wave
+import webrtcvad
+import openai
+import io
 from pydub import AudioSegment
-from transformers import pipeline
-from dotenv import load_dotenv
+import edge_tts
+import os
 
-load_dotenv()
-
-# Set OpenAI API key
+# Set up OpenAI API key
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
-# Initialize Whisper model
-whisper_model = whisper.load_model("base")
+# Function to read WAV file
+def read_wav(file_path):
+    with wave.open(file_path, 'rb') as wf:
+        sample_rate = wf.getframerate()
+        n_channels = wf.getnchannels()
+        samp_width = wf.getsampwidth()
+        n_frames = wf.getnframes()
+        audio = wf.readframes(n_frames)
+        return np.frombuffer(audio, dtype=np.int16), sample_rate
 
-# Initialize Hugging Face LLM model
-llm_pipeline = pipeline("text-generation", model="llama-13b")  # Example model, replace as needed
+# Function to perform VAD
+def vad(audio, sample_rate, vad_mode=1):
+    vad = webrtcvad.Vad(vad_mode)
+    frame_duration = 30  # ms
+    frame_size = int(sample_rate * frame_duration / 1000)
+    frames = [audio[i:i + frame_size] for i in range(0, len(audio), frame_size)]
+    return [frame for frame in frames if vad.is_speech(frame, sample_rate)]
 
-def speech_to_text_with_vad(audio_file):
-    # Convert audio file to the correct format if needed
-    audio = AudioSegment.from_file(audio_file, format="wav")
-    audio = audio.set_channels(1).set_frame_rate(16000)  # Ensure mono and 16 kHz
+# Convert audio to text using Whisper
+def audio_to_text(audio_path):
+    model = whisper.load_model("base")  # Load Whisper model
+    audio, sample_rate = read_wav(audio_path)
+    audio = np.array(vad(audio, sample_rate))
+    audio_wav = io.BytesIO()
+    audio_segment = AudioSegment(
+        audio.tobytes(), 
+        frame_rate=sample_rate, 
+        sample_width=2, 
+        channels=1
+    )
+    audio_segment.export(audio_wav, format="wav")
+    audio_wav.seek(0)
+    result = model.transcribe(audio_wav, fp16=False)
+    return result['text']
 
-    # Use Whisper model to transcribe the audio
-    result = whisper_model.transcribe(audio_file, language="en")
-    transcript = result['text']
+# Get response from OpenAI's GPT-4o-mini model
+def get_llm_response(text):
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": text}
+        ]
+    )
+    return response.choices[0].message['content']
 
-    # Optional: Implement VAD logic to process transcript
-    return transcript
+# Convert text to speech using Edge TTS
+async def text_to_speech(text, voice='en-US-JennyNeural', pitch='0%', speed='1.0'):
+    communicator = edge_tts.Communicate()
+    output_file = "output.mp3"
+    await communicator.synthesize(text, voice, pitch, speed, output_file)
+    return output_file
 
-def get_llm_response(messages):
-    # Extract the latest user message
-    user_message = messages[-1]["content"]
-
-    # Generate a response using the LLM
-    response = llm_pipeline(user_message, max_length=50, do_sample=True)[0]['generated_text']
-
-    # Limit the response to 2 sentences
-    sentences = response.split('.')
-    response = '.'.join(sentences[:2]) + '.'
-    return response
-
-def text_to_speech(text, voice_type, pitch, speed):
-    # Using a TTS model to generate speech
-    from pyttsx3 import init
-
-    tts_engine = init()
-    tts_engine.setProperty('rate', speed * 100)  # Speed
-    tts_engine.setProperty('pitch', pitch)  # Pitch, if supported
-
-    # Choose voice based on user selection
-    voices = tts_engine.getProperty('voices')
-    if voice_type == 'male':
-        tts_engine.setProperty('voice', voices[0].id)  # Example, adjust as necessary
-    else:
-        tts_engine.setProperty('voice', voices[1].id)  # Example, adjust as necessary
-
-    # Generate and save speech audio
-    audio_file = 'response.wav'
-    tts_engine.save_to_file(text, audio_file)
-    tts_engine.runAndWait()
-
-    return audio_file
-
-def autoplay_audio(file_path):
-    # Function to play audio in Streamlit (if needed)
-    import streamlit as st
-    st.audio(file_path, format='audio/wav')
+# Restrict the output to 2 sentences
+def restrict_output(response_text):
+    sentences = response_text.split('. ')
+    return '. '.join(sentences[:2]) + ('.' if sentences else '')
