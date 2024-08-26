@@ -1,8 +1,12 @@
 import streamlit as st
 import os
+from dotenv import load_dotenv
 from utils import get_openai_response, speech_to_text_with_vad, text_to_speech, autoplay_audio
 from audio_recorder_streamlit import audio_recorder
-from streamlit_float import *
+from streamlit_float import float_init
+
+# Load environment variables from .env file
+load_dotenv()
 
 st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
 
@@ -28,6 +32,7 @@ with voice_col1:
 
 footer = st.container()
 
+prompt = None
 prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
 with footer:
     audio = audio_recorder()
@@ -43,7 +48,7 @@ if prompt:
 
 if audio:
     with st.spinner("Transcribing audio..."):
-        audio_file = 'temp_audio.mp3'
+        audio_file = 'temp_audio.wav'
         with open(audio_file, 'wb') as f:
             f.write(audio)
 
