@@ -24,11 +24,10 @@ with voice_col1:
         "Choose your preferred voice",
         ['Alloy', 'Echo', 'Fable', 'Onyx', 'Nova', 'Shimmer'],
         placeholder="Select a voice"
-    ).lower()
+        ).lower()
 
 footer = st.container()
 
-prompt = None
 prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
 with footer:
     audio = audio_recorder()
@@ -67,5 +66,5 @@ if st.session_state.messages[-1]["role"] == "user":
         st.write(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
         os.remove(response_audio)
-    
+
 footer.float("bottom: -0.25rem;")
