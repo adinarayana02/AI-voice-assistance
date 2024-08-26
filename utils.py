@@ -5,42 +5,27 @@ import wave
 import tempfile
 from gtts import gTTS
 from io import BytesIO
-from pydub import AudioSegment
+import whisper
 
 # Initialize OpenAI API (replace with your own API key)
-openai.api_key = 'YOUR_OPENAI_API_KEY'
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def get_gpt4omini_response(prompt):
+    # Make a request to the GPT-4o Mini model
     response = openai.ChatCompletion.create(
-        model="gpt-4-omni",
+        model="gpt-4o-mini",  # Ensure this is the correct model name for GPT-4o Mini
         messages=[
             {"role": "user", "content": prompt}
         ]
     )
     return response['choices'][0]['message']['content']
 
-def vad(audio_file):
-    vad = webrtcvad.Vad(1)
-    audio_data = AudioSegment.from_file(audio_file, format='wav').get_raw_data()
-    sample_rate = 16000
-    frame_duration = 30  # ms
-    frame_size = int(sample_rate * frame_duration / 1000)
-    frames = [audio_data[i:i + frame_size] for i in range(0, len(audio_data), frame_size)]
-    voiced_frames = [frame for frame in frames if vad.is_speech(frame, sample_rate)]
-    voiced_audio = b''.join(voiced_frames)
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_file:
-        with wave.open(temp_file.name, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(sample_rate)
-            wf.writeframes(voiced_audio)
-        return temp_file.name
-
 def speech_to_text_with_vad(audio_file):
-    import whisper
+    # Use VAD to process audio
+    vad_file = vad(audio_file)
+    # Load Whisper model and transcribe
     model = whisper.load_model("base")
-    result = model.transcribe(audio_file)
+    result = model.transcribe(vad_file)
     return result['text']
 
 def text_to_speech(text):
@@ -51,3 +36,67 @@ def text_to_speech(text):
 
 def autoplay_audio(file_path):
     st.audio(file_path, format='audio/mp3')
+
+def vad(audio_file):
+    vad = webrtcvad.Vad(1)
+    audio, sample_rate = read_wave(audio_file)
+    segments = vad_collector(sample_rate, 30, 300, vad, audio)
+    output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav').name
+    save_wave(output_file, segments, sample_rate)
+    return output_file
+
+def read_wave(path):
+    with wave.open(path, "rb") as wf:
+        num_channels = wf.getnchannels()
+        assert num_channels == 1
+        sample_width = wf.getsampwidth()
+        assert sample_width == 2
+        sample_rate = wf.getframerate()
+        assert sample_rate in (8000, 16000, 32000, 48000)
+        pcm_data = wf.readframes(wf.getnframes())
+        return pcm_data, sample_rate
+
+def save_wave(path, audio, sample_rate):
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(audio)
+
+def vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, audio):
+    num_padding_frames = padding_duration_ms // frame_duration_ms
+    ring_buffer = deque(maxlen=num_padding_frames)
+    triggered = False
+    voiced_frames = []
+    for frame in frame_generator(frame_duration_ms, audio, sample_rate):
+        is_speech = vad.is_speech(frame.bytes, sample_rate)
+        if not triggered:
+            ring_buffer.append((frame, is_speech))
+            num_voiced = len([f for f, speech in ring_buffer if speech])
+            if num_voiced > 0.9 * ring_buffer.maxlen:
+                triggered = True
+                voiced_frames.extend([f for f, speech in ring_buffer])
+                ring_buffer.clear()
+        else:
+            voiced_frames.append(frame)
+            ring_buffer.append((frame, is_speech))
+            num_unvoiced = len([f for f, speech in ring_buffer if not speech])
+            if num_unvoiced > 0.9 * ring_buffer.maxlen:
+                triggered = False
+                yield b''.join([f.bytes for f in voiced_frames])
+                ring_buffer.clear()
+                voiced_frames = []
+    if voiced_frames:
+        yield b''.join([f.bytes for f in voiced_frames])
+
+def frame_generator(frame_duration_ms, audio, sample_rate):
+    n = int(sample_rate * (frame_duration_ms / 1000.0) * 2)
+    offset = 0
+    while offset + n < len(audio):
+        yield Frame(audio[offset:offset + n], offset / n)
+        offset += n
+
+class Frame(object):
+    def __init__(self, bytes, timestamp):
+        self.bytes = bytes
+        self.timestamp = timestamp
