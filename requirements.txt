@@ -3,5 +3,4 @@ openai
 gtts
 pydub
 python-dotenv
-audio_recorder_streamlit
-streamlit-float
+requests
