@@ -5,18 +5,18 @@ import wave
 import tempfile
 from gtts import gTTS
 from io import BytesIO
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize OpenAI API (use the environment variable)
+# Initialize OpenAI API key
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def get_openai_response(messages):
     """
-    Get a response from the OpenAI API using GPT-4-OMini.
+    Get response from GPT-4 using OpenAI API.
     """
     response = openai.ChatCompletion.create(
         model="gpt-4-omni",  # Ensure this is the correct model name for GPT-4-OMini
@@ -26,22 +26,18 @@ def get_openai_response(messages):
 
 def speech_to_text_with_vad(audio_file):
     """
-    Convert speech to text using Whisper and apply Voice Activity Detection (VAD).
+    Convert speech to text using VAD and Whisper.
     """
-    # Apply VAD to the audio file
     vad_file = vad(audio_file)
-    
-    # Load Whisper model
+    # Assume VAD processing returns a valid WAV file path
     import whisper
     model = whisper.load_model("base")
-    
-    # Read and transcribe the audio
     result = model.transcribe(vad_file)
     return result['text']
 
-def text_to_speech(text, voice):
+def text_to_speech(text, voice='default'):
     """
-    Convert text to speech using gTTS and return the path to the saved audio file.
+    Convert text to speech.
     """
     tts = gTTS(text, lang='en')
     tts_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
@@ -50,7 +46,7 @@ def text_to_speech(text, voice):
 
 def autoplay_audio(file_path):
     """
-    Play audio file in Streamlit.
+    Play the audio file.
     """
     st.audio(file_path, format='audio/mp3')
 
@@ -59,7 +55,7 @@ def vad(audio_file):
     Apply Voice Activity Detection (VAD) to the audio file and save the processed audio.
     """
     # Initialize VAD
-    vad = webrtcvad.Vad(1)
+    vad = webrtcvad.Vad(1)  # Mode 1 is a trade-off between sensitivity and false positives
     
     # Read the audio file
     with wave.open(audio_file, 'rb') as wf:
@@ -68,27 +64,32 @@ def vad(audio_file):
         sampwidth = wf.getsampwidth()
         audio_data = wf.readframes(wf.getnframes())
     
-    # Convert audio data to a format suitable for VAD
-    frame_duration = 30  # ms
-    frames_per_buffer = int(sample_rate * frame_duration / 1000)
+    # Ensure audio data is in 16-bit PCM format
+    if sampwidth != 2:
+        raise ValueError("Audio sample width must be 2 bytes (16-bit PCM).")
+
+    # Convert audio data to a numpy array
+    audio_np = np.frombuffer(audio_data, dtype=np.int16)
     
-    def frames_generator(audio_data, frame_duration, sample_rate):
-        num_channels = 1  # Assuming mono audio
-        frame_size = int(sample_rate * frame_duration / 1000 * num_channels * sampwidth)
-        for start in range(0, len(audio_data), frame_size):
-            end = min(start + frame_size, len(audio_data))
-            yield audio_data[start:end]
+    # Define frame duration and calculate frame size
+    frame_duration_ms = 30
+    frame_size = int(sample_rate * frame_duration_ms / 1000)
+    
+    def frames_generator(audio_np, frame_size):
+        """Generate frames of audio data."""
+        for start in range(0, len(audio_np), frame_size):
+            yield audio_np[start:start + frame_size]
 
     filtered_audio = bytearray()
     
-    for frame in frames_generator(audio_data, frame_duration, sample_rate):
-        if vad.is_speech(frame, sample_rate):
-            filtered_audio.extend(frame)
+    for frame in frames_generator(audio_np, frame_size):
+        if vad.is_speech(frame.tobytes(), sample_rate):
+            filtered_audio.extend(frame.tobytes())
     
     # Save filtered audio
     vad_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
     with wave.open(vad_file.name, 'wb') as wf:
-        wf.setnchannels(1)
+        wf.setnchannels(1)  # Assuming mono audio
         wf.setsampwidth(sampwidth)
         wf.setframerate(sample_rate)
         wf.writeframes(filtered_audio)
