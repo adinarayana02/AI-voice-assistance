@@ -1,75 +1,42 @@
 import streamlit as st
-import os
-from utils import get_llm_response, speech_to_text_with_vad, text_to_speech, autoplay_audio
-from audio_recorder_streamlit import audio_recorder
-from dotenv import load_dotenv
+import asyncio
+from utils import audio_to_text, get_llm_response, text_to_speech, restrict_output
 
-load_dotenv()
+st.title("Voice and Text AI Assistant")
 
-st.set_page_config(page_title="AI Voice Assistant", page_icon="🤖", layout="wide")
+# Section for Text Input
+st.header("Enter Your Query")
+text_query = st.text_area("Type your question here:", "")
 
-def initialize_session_state():
-    if "messages" not in st.session_state:
-        st.session_state.messages = [
-            {"role": "assistant", "content": "Hi! How may I assist you today?"}
-        ]
+# Section for Audio Input
+st.header("Or Speak Your Query")
+audio_file = st.file_uploader("Upload an audio file (WAV format only):", type=["wav"])
 
-initialize_session_state()
+# Process Text Input
+if text_query:
+    st.subheader("Response")
+    response_text = get_llm_response(text_query)
+    st.write(restrict_output(response_text))
+    
+    # Convert text response to speech
+    audio_file = asyncio.run(text_to_speech(response_text))
+    st.audio(audio_file, format="audio/mp3")
 
-st.title("Your Personal Voice Assistant 🤖")
+# Process Audio Input
+if audio_file:
+    # Save uploaded audio to a temporary file
+    with open("uploaded_audio.wav", "wb") as f:
+        f.write(audio_file.read())
 
-voice_col1, voice_col2 = st.columns([1, 2])
-with voice_col1:
-    voice = st.selectbox(
-        "Choose your preferred voice",
-        ['Male', 'Female'],
-        placeholder="Select a voice"
-        ).lower()
-
-with voice_col2:
-    pitch = st.slider("Pitch", min_value=-10, max_value=10, value=0)
-    speed = st.slider("Speed", min_value=0.5, max_value=2.0, value=1.0)
-
-footer = st.container()
-
-prompt = None
-prompt = st.chat_input("Enter your message here or click on the microphone to start recording")
-with footer:
-    audio = audio_recorder()
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
-
-if prompt:
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.write(prompt)
-
-if audio:
-    with st.spinner("Transcribing audio..."):
-        audio_file = 'temp_audio.wav'
-        with open(audio_file, 'wb') as f:
-            f.write(audio)
-
-        transcript = speech_to_text_with_vad(audio_file)
-        if transcript:
-            st.session_state.messages.append({"role": "user", "content": transcript})
-            with st.chat_message("user"):
-                st.write(transcript)
-            os.remove(audio_file)
-
-if st.session_state.messages[-1]["role"] == "user":
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            response = get_llm_response(st.session_state.messages)
-
-        with st.spinner("Generating response..."):
-            response_audio = text_to_speech(response, voice, pitch, speed)
-            autoplay_audio(response_audio)
-
-        st.write(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        os.remove(response_audio)
-
-footer.float("bottom: -0.25rem;")
+    st.subheader("Audio Processing")
+    # Convert audio to text
+    transcript = audio_to_text("uploaded_audio.wav")
+    st.write("Transcript:", transcript)
+    
+    # Generate response from transcript
+    response_text = get_llm_response(transcript)
+    st.write(restrict_output(response_text))
+    
+    # Convert text response to speech
+    audio_file = asyncio.run(text_to_speech(response_text))
+    st.audio(audio_file, format="audio/mp3")
