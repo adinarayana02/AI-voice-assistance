@@ -2,6 +2,10 @@ import openai
 import os
 from dotenv import load_dotenv
 import base64
+from whisper import load_model, transcribe
+from gtts import gTTS
+from pydub import AudioSegment
+import io
 
 load_dotenv()
 
@@ -19,25 +23,15 @@ def get_openai_response(messages):
     return response.choices[0].message["content"]
 
 def speech_to_text(audio_binary):
-    with open(audio_binary, 'rb') as audio_file:
-        transcript = openai.Audio.transcriptions.create(
-            model='whisper-1',
-            file=audio_file,
-            response_format='text'
-        )
-    return transcript['text']
+    model = load_model("base")  # Load Whisper model
+    result = transcribe(model, audio_binary)
+    return result['text']
 
 def text_to_speech(text, voice='nova'):
-    response = openai.Audio.create(
-        model='text-to-speech-1',
-        input=text,
-        voice=voice
-    )
-    response_audio = 'output_audio.mp3'
-    with open(response_audio, 'wb') as f:
-        f.write(response['data'])
-    
-    return response_audio
+    tts = gTTS(text=text, lang='en', slow=False)
+    audio_file = 'output_audio.mp3'
+    tts.save(audio_file)
+    return audio_file
 
 def autoplay_audio(audio_file):
     with open(audio_file, 'rb') as audio_file_:
