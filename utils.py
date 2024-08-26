@@ -9,7 +9,7 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def get_openai_response(messages):
-    system_message = [{"role": "system", "content": "You are a helpful AI chatbot, that answers questions asked by User."}]
+    system_message = [{"role": "system", "content": "You are a helpful AI chatbot that answers questions asked by User."}]
     prompt_message = system_message + messages
 
     response = openai.ChatCompletion.create(
@@ -25,18 +25,17 @@ def speech_to_text(audio_binary):
             file=audio_file,
             response_format='text'
         )
-    return transcript["text"]
+    return transcript['text']
 
 def text_to_speech(text, voice='nova'):
     response = openai.Audio.create(
         model='text-to-speech-1',
-        text=text,
+        input=text,
         voice=voice
     )
-
     response_audio = 'output_audio.mp3'
     with open(response_audio, 'wb') as f:
-        f.write(response["data"])
+        f.write(response['data'])
     
     return response_audio
 
