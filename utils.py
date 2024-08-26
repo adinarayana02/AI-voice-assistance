@@ -5,8 +5,13 @@ import wave
 import tempfile
 from gtts import gTTS
 from io import BytesIO
+from dotenv import load_dotenv
+import os
 
-# Initialize OpenAI API (replace with your own API key)
+# Load environment variables from .env file
+load_dotenv()
+
+# Initialize OpenAI API (use the environment variable)
 openai.api_key = os.getenv('OPENAI_API_KEY')
 
 def get_openai_response(messages):
