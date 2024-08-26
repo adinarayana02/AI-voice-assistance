@@ -1,42 +1,53 @@
 import streamlit as st
+import io
+from utils import get_llm_response, audio_to_text, text_to_speech, restrict_output
 import asyncio
-from utils import audio_to_text, get_llm_response, text_to_speech, restrict_output
 
+# Streamlit app
 st.title("Voice and Text AI Assistant")
 
-# Section for Text Input
-st.header("Enter Your Query")
-text_query = st.text_area("Type your question here:", "")
+# Audio input section
+st.header("Voice Input")
+audio_file = st.file_uploader("Upload an audio file", type=["wav", "mp3"])
 
-# Section for Audio Input
-st.header("Or Speak Your Query")
-audio_file = st.file_uploader("Upload an audio file (WAV format only):", type=["wav"])
+if st.button("Record Audio"):
+    st.write("Please record your audio below.")
+    # Use `st.audio` to capture audio input from microphone if available
 
-# Process Text Input
-if text_query:
-    st.subheader("Response")
-    response_text = get_llm_response(text_query)
-    st.write(restrict_output(response_text))
+# Text input section
+st.header("Text Input")
+user_input = st.text_area("Enter your query here")
+
+if st.button("Submit"):
+    # Handle audio file input
+    if audio_file is not None:
+        with open("temp_audio.wav", "wb") as f:
+            f.write(audio_file.read())
+        # Convert audio to text
+        query_text = audio_to_text("temp_audio.wav")
+    else:
+        query_text = user_input
     
-    # Convert text response to speech
-    audio_file = asyncio.run(text_to_speech(response_text))
-    st.audio(audio_file, format="audio/mp3")
-
-# Process Audio Input
-if audio_file:
-    # Save uploaded audio to a temporary file
-    with open("uploaded_audio.wav", "wb") as f:
-        f.write(audio_file.read())
-
-    st.subheader("Audio Processing")
-    # Convert audio to text
-    transcript = audio_to_text("uploaded_audio.wav")
-    st.write("Transcript:", transcript)
+    # Restrict the response to 2 sentences
+    query_text = restrict_output(query_text)
     
-    # Generate response from transcript
-    response_text = get_llm_response(transcript)
-    st.write(restrict_output(response_text))
+    # Get response from LLM
+    response_text = get_llm_response(query_text)
     
-    # Convert text response to speech
-    audio_file = asyncio.run(text_to_speech(response_text))
-    st.audio(audio_file, format="audio/mp3")
+    # Restrict response text to 2 sentences
+    response_text = restrict_output(response_text)
+    
+    # Convert text to speech
+    async def generate_speech():
+        audio_file = await text_to_speech(response_text)
+        return audio_file
+    
+    audio_file_path = asyncio.run(generate_speech())
+    
+    # Display response
+    st.subheader("AI Response")
+    st.write(response_text)
+    
+    # Play audio response
+    with open(audio_file_path, "rb") as audio_file:
+        st.audio(audio_file.read(), format="audio/mp3")
